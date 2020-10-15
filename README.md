@@ -17,7 +17,7 @@
 1. Python:
     * pymavlink
 2. ROS:
-    * gs_nodes
+    * gs_core
     * gs_board
     * gs_flight
     * gs_module
@@ -25,4 +25,4 @@
     * gs_logger
 
 ## Примечание:
-Для работы всех нод в данном пакете необходима запущенная нода ros_serial_node.py из пакета gs_nodes
+Для работы всех нод в данном пакете необходима запущенная нода ros_serial_node.py из пакета gs_core
