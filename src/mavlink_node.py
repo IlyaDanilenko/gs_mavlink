@@ -6,11 +6,10 @@ from pymavlink import mavutil
 from pymavlink.dialects.v10 import ardupilotmega
 import rospy
 import os
-from gs_board import *
-from gs_flight import *
-from gs_module import *
-from gs_sensors import *
-from gs_logger import *
+from gs_board import BoardManager
+from gs_flight import FlightController
+from gs_sensors import SensorManager
+from threading import Thread
 import math
 TARGET_SYSTEM=None
 MISSIN_COUNT=None
@@ -43,22 +42,16 @@ def start_mission(mission_list):
             if(i[1]!=0.0):
                 flight.updateYaw(i[1])
 
-rospy.init_node("mavlink_node")
+rospy.init_node("mavlink_node",disable_signals=True)
 try:
     board = BoardManager()
     flight=FlightController()
-    led_b=BoardLedController()
-    led_m=ModuleLedController()
     sensors=SensorManager()
-    # log=Logger()
 
     while not board.runStatus():
         pass
 
-    rospy.loginfo("MAVLink Server ON")
-
-    led_b.changeAllColor(0,0,0)
-    led_m.changeAllColor(0,0,0)
+    print("MAVLink Server ON")
     hostname=os.popen('ip addr show wlan0').read().split("inet ")[1].split("/")[0]
     master = mavutil.mavlink_connection('udpin:'+hostname+':14555',source_component=TARGET_COMP)
     master.wait_heartbeat()
@@ -91,17 +84,19 @@ try:
                     pitchspeed=0.01,
                     yawspeed=0.01
             )
-            # master.mav.global_position_int_send(
-            #     time_boot_ms=int(time()),
-            #     lat=1,
-            #     lon=1,
-            #     alt=int(altitude),
-            #     relative_alt=int(altitude),
-            #     vx=0,
-            #     vy=0,
-            #     vz=0,
-            #     hdg=0
-            # )
+            rel_altitude=sensors.altitude()
+            latitude,longitude,altitude=sensors.globalPosition()
+            master.mav.global_position_int_send(
+                time_boot_ms=board.time(),
+                lat=latitude,
+                lon=longitude,
+                alt=altitude,
+                relative_alt=int(rel_altitude),
+                vx=0,
+                vy=0,
+                vz=0,
+                hdg=0
+            )
             if(protocol):
                 master.mav.sys_status_send(
                         onboard_control_sensors_present=32,
@@ -149,7 +144,7 @@ try:
                         command=mavutil.mavlink.MAV_CMD_MISSION_START,
                         result=mavutil.mavlink.MAV_RESULT_ACCEPTED
                 )
-                start_mission([MISSION_LIST[msg.seq]])
+                Thread(start_mission([MISSION_LIST[msg.seq]])).start()
             elif(type(msg)==ardupilotmega.MAVLink_param_request_list_message):
                 master.mav.param_value_send(
                         param_id=b"pioneermax_gs_em",
@@ -187,7 +182,7 @@ try:
                                 command=mavutil.mavlink.MAV_CMD_MISSION_START,
                                 result=mavutil.mavlink.MAV_RESULT_ACCEPTED
                         )
-                        start_mission(MISSION_LIST)
+                        Thread(start_mission(MISSION_LIST)).start()
                     else:
                         master.mav.command_ack_send(
                                 command=mavutil.mavlink.MAV_CMD_MISSION_START,
@@ -195,7 +190,7 @@ try:
                         )
                 elif(msg.command==mavutil.mavlink.MAV_CMD_NAV_TAKEOFF):
                     print("TAKEOFF")
-                    flight.takeoff()
+                    Thread(flight.takeoff()).start()
                     master.mav.command_ack_send(
                             command=mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
                             result=mavutil.mavlink.MAV_RESULT_ACCEPTED
@@ -207,13 +202,13 @@ try:
                                 result=mavutil.mavlink.MAV_RESULT_ACCEPTED
                         )
                         MODE=mavutil.mavlink.MAV_MODE_GUIDED_DISARMED
-                        flight.landing()
+                        Thread(flight.landing()).start()
                     elif (msg.param1==1.0):
                         master.mav.command_ack_send(
                                 command=mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
                                 result=mavutil.mavlink.MAV_RESULT_ACCEPTED
                         )
                         MODE=mavutil.mavlink.MAV_MODE_GUIDED_ARMED
-                        flight.preflight()
+                        Thread(flight.preflight()).start()
 except:
     pass
