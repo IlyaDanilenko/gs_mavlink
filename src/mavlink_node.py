@@ -43,7 +43,7 @@ def start_mission(mission_list):
             if(i[1]!=0.0):
                 flight.updateYaw(i[1])
 
-rospy.init_node("mavlink_node",disable_signals=True)
+rospy.init_node("mavlink_node")
 try:
     board = BoardManager()
     flight=FlightController()
@@ -90,9 +90,9 @@ try:
             latitude,longitude,altitude=navigation.globalPosition()
             master.mav.global_position_int_send(
                 time_boot_ms=int(board.time()),
-                lat=int(latitude),
-                lon=int(longitude),
-                alt=int(altitude),
+                lat=int(latitude * 1e7),
+                lon=int(longitude * 1e7),
+                alt=int(altitude * 1e3),
                 relative_alt=int(rel_altitude),
                 vx=0,
                 vy=0,
