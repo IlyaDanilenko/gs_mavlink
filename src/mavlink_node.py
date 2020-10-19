@@ -147,7 +147,7 @@ try:
                         command=mavutil.mavlink.MAV_CMD_MISSION_START,
                         result=mavutil.mavlink.MAV_RESULT_ACCEPTED
                 )
-                Thread(start_mission([MISSION_LIST[msg.seq]])).start()
+                Thread(target=start_mission, args=([MISSION_LIST[msg.seq]],)).start()
             elif(type(msg)==ardupilotmega.MAVLink_param_request_list_message):
                 master.mav.param_value_send(
                         param_id=b"pioneermax_gs_em",
@@ -185,7 +185,7 @@ try:
                                 command=mavutil.mavlink.MAV_CMD_MISSION_START,
                                 result=mavutil.mavlink.MAV_RESULT_ACCEPTED
                         )
-                        Thread(start_mission(MISSION_LIST)).start()
+                        Thread(target=start_mission, args=(MISSION_LIST,)).start()
                     else:
                         master.mav.command_ack_send(
                                 command=mavutil.mavlink.MAV_CMD_MISSION_START,
@@ -205,13 +205,13 @@ try:
                                 result=mavutil.mavlink.MAV_RESULT_ACCEPTED
                         )
                         MODE=mavutil.mavlink.MAV_MODE_GUIDED_DISARMED
-                        Thread(flight.landing()).start()
+                        Thread(target=flight.landing).start()
                     elif (msg.param1==1.0):
                         master.mav.command_ack_send(
                                 command=mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
                                 result=mavutil.mavlink.MAV_RESULT_ACCEPTED
                         )
                         MODE=mavutil.mavlink.MAV_MODE_GUIDED_ARMED
-                        Thread(flight.preflight()).start()
+                        Thread(target=flight.preflight).start()
 except:
     pass
