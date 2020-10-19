@@ -78,7 +78,7 @@ try:
             pitch=pitch*math.pi/180
             yaw=yaw*math.pi/180
             master.mav.attitude_send(
-                    time_boot_ms=int(time()),
+                    time_boot_ms=int(board.time()),
                     roll=roll,
                     pitch=pitch,
                     yaw=yaw,
@@ -89,10 +89,10 @@ try:
             rel_altitude=sensors.altitude()
             latitude,longitude,altitude=navigation.globalPosition()
             master.mav.global_position_int_send(
-                time_boot_ms=board.time(),
-                lat=latitude,
-                lon=longitude,
-                alt=altitude,
+                time_boot_ms=int(board.time()),
+                lat=int(latitude),
+                lon=int(longitude),
+                alt=int(altitude),
                 relative_alt=int(rel_altitude),
                 vx=0,
                 vy=0,
@@ -100,7 +100,7 @@ try:
                 hdg=0
             )
             if(protocol):
-                _,voltage=sensors.power()
+                voltage,_,_=sensors.power()
                 master.mav.sys_status_send(
                         onboard_control_sensors_present=32,
                         onboard_control_sensors_enabled=32,
