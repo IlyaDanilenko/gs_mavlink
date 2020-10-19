@@ -9,6 +9,7 @@ import os
 from gs_board import BoardManager
 from gs_flight import FlightController
 from gs_sensors import SensorManager
+from gs_navigation import NavigationManager
 from threading import Thread
 import math
 TARGET_SYSTEM=None
@@ -47,6 +48,7 @@ try:
     board = BoardManager()
     flight=FlightController()
     sensors=SensorManager()
+    navigation=NavigationManager()
 
     while not board.runStatus():
         pass
@@ -85,7 +87,7 @@ try:
                     yawspeed=0.01
             )
             rel_altitude=sensors.altitude()
-            latitude,longitude,altitude=sensors.globalPosition()
+            latitude,longitude,altitude=navigation.globalPosition()
             master.mav.global_position_int_send(
                 time_boot_ms=board.time(),
                 lat=latitude,
@@ -98,12 +100,13 @@ try:
                 hdg=0
             )
             if(protocol):
+                _,voltage=sensors.power()
                 master.mav.sys_status_send(
                         onboard_control_sensors_present=32,
                         onboard_control_sensors_enabled=32,
                         onboard_control_sensors_health=1,
                         load=0,
-                        voltage_battery=12000,
+                        voltage_battery=int(voltage) * 1000,
                         current_battery=2500,
                         battery_remaining=-1,
                         drop_rate_comm=0,

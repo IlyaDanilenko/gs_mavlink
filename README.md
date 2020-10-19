@@ -23,6 +23,7 @@
     * gs_module
     * gs_sensors
     * gs_logger
+    * gs_navigation
 
 ## Примечание:
 Для работы всех нод в данном пакете необходима запущенная нода ros_serial_node.py из пакета gs_core
