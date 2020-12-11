@@ -20,11 +20,9 @@
     * gs_core
     * gs_board
     * gs_flight
-    * gs_module
     * gs_sensors
-    * gs_logger
     * gs_navigation
 
 ## Примечание:
-* Для работы всех нод в данном пакете необходима запущенная нода ros_serial_node.py из пакета gs_core.
+* Для работы всех нод в данном пакете необходима запущенная нода ros_plaz_node.py из пакета gs_core.
 * Автопилот версии ниже 1.5.7 не поддерживается.
