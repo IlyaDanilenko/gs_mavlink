@@ -7,7 +7,7 @@ from pymavlink.dialects.v10 import ardupilotmega
 import rospy
 import os
 from gs_board import BoardManager
-from gs_flight import FlightController
+from gs_flight import FlightController, CallbackEvent
 from gs_sensors import SensorManager
 from gs_navigation import NavigationManager
 from threading import Thread
@@ -19,29 +19,49 @@ MISSION_LIST = []
 CUSTOM_MODE = 0
 
 def start_mission(mission_list):
-    global flight
+    def callback(event):
+        global mission_list
+        global mission_flight
+        global start_point
+        event = event.data
+        i = 0
+        if event == CallbackEvent.ENGINES_STARTED:
+            if mission_list[i][0] == mavutil.mavlink.MAV_CMD_NAV_TAKEOFF:
+                mission_flight.takeoff()
+        elif event == CallbackEvent.TAKEOFF_COMPLETE:
+            if ( mission_list[i][1] != 0.0 ) or ( mission_list[i][1] != float("nan") ):
+                mission_flight.updateYaw(mission_list[i][1])
+            mision_flight.goToPoint(mission_list[i][2],mission_list[i][3], mission_list[i][4])
+            i+=1
+        elif event == CallbackEvent.POINT_REACHED:
+            if i == len(mission_list):
+                if ( start_point[1] != 0.0 ) or ( start_point[1] != float("nan") ):
+                    mission_flight.updateYaw(start_point[1])
+                mission_flight.landing()
+            elif mission_list[i][0] == mavutil.mavlink.MAV_CMD_NAV_WAYPOINT:
+                if ( mission_list[i][1] != 0.0 ) or ( mission_list[i][1] != float("nan") ):
+                    mission_flight.updateYaw(mission_list[i][1])
+                mision_flight.goToPoint(mission_list[i][2],mission_list[i][3], mission_list[i][4])
+                i += 1
+            elif misiion_list[i][0] == mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH:
+                mission_flight.goToPoint(start_point[2], start_point[3], start_point[4])
+                i += 1
+            elif mission_list[i][0] == mavutil.mavlink.MAV_CMD_NAV_LAND:
+                mission_flight.landing()
+        elif event == CallbackEvent.COPTER_LANDED:
+            mission = False
+
     global MODE
+    mission = True
     if len(mission_list) != 1:
         mission_list[0], mission_list[1] = mission_list[1], mission_list[0]
         start_point = mission_list[1]
     else:
         start_point = mission_list[0]
-    for i in mission_list:
-        if i[0] == mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH:
-            flight.goToPoint(start_point[2] ,start_point[3], start_point[4])
-            if(start_point[1]!=0.0):
-                flight.updateYaw(start_point[1])
-            flight.landing()
-            MODE = mavutil.mavlink.MAV_MODE_GUIDED_DISARMED
-        elif i[0] == mavutil.mavlink.MAV_CMD_NAV_LAND:
-            flight.landing()
-            MODE = mavutil.mavlink.MAV_MODE_GUIDED_DISARMED
-        elif i[0] == mavutil.mavlink.MAV_CMD_NAV_TAKEOFF:
-            flight.takeoff()
-        elif i[0] == mavutil.mavlink.MAV_CMD_NAV_WAYPOINT:
-            flight.goToPoint(i[2], i[3], i[4])
-            if i[1] != 0.0:
-                flight.updateYaw(i[1])
+    print(type(mission_list[0][1]))
+    mission_flight = FlightController(callback)
+    while mission:
+        pass
 
 def send_status(board, sensors, navigation):
     global MODE
@@ -57,7 +77,7 @@ def send_status(board, sensors, navigation):
         roll,pitch,yaw = sensors.orientation()
         roll = roll*math.pi/180
         pitch = pitch*math.pi/180
-        if navigation.navigationSystem() == navigation.gps.name:
+        if navigation.system() == navigation.gps.name:
             yaw = (yaw + 180) % 360
         yaw = yaw*math.pi/180
         master.mav.attitude_send(
@@ -70,7 +90,7 @@ def send_status(board, sensors, navigation):
             yawspeed = 0.01
         )
         rel_altitude = sensors.altitude()
-        latitude,longitude,altitude = navigation.gps.globalPosition()
+        latitude,longitude,altitude = navigation.gps.position()
         master.mav.global_position_int_send(
             time_boot_ms = int(board.time()),
             lat = int(latitude * 1e7),
@@ -99,16 +119,26 @@ def send_status(board, sensors, navigation):
             errors_count4 = 0
         )
 
+def mode_callback(event):
+    global MODE
+    event = event.data
+    if event == CallbackEvent.ENGINES_STARTED:
+        MODE = mavutil.mavlink.MAV_MODE_GUIDED_ARMED
+    elif event == CallbackEvent.COPTER_LANDED:
+        MODE = mavutil.mavlink.MAV_MODE_GUIDED_DISARMED
+    elif event == CallbackEvent.ALL:
+        MODE = mavutil.mavlink.MAV_MODE_GUIDED_DISARMED
+
 rospy.init_node("mavlink_node")
 try:
     board = BoardManager()
-    flight = FlightController()
+    flight = FlightController(mode_callback)
     sensors = SensorManager()
     navigation = NavigationManager()
     while not board.runStatus():
         pass
     
-    hostname = os.popen('ip addr show eth0').read().split("inet ")[1].split("/")[0]
+    hostname = os.popen('ip addr show wlan0').read().split("inet ")[1].split("/")[0]
     master = mavutil.mavlink_connection('udpin:'+hostname+':14550',source_component = TARGET_COMP)
     print("MAVLink Server active on {}:14550".format(hostname))
     master.wait_heartbeat()
@@ -218,7 +248,6 @@ try:
                                 command = mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
                                 result = mavutil.mavlink.MAV_RESULT_ACCEPTED
                         )
-                        MODE = mavutil.mavlink.MAV_MODE_GUIDED_ARMED
                         Thread(target=flight.preflight).start()
     master.close()
 except Exception as e:
